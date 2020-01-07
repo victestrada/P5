@@ -36,7 +36,7 @@ visualizar el funcionamiento de la curva ADSR.
     - ADSR_A:tiempo de ataque de 0 a 1.
     - ADSR_D:tiempo de bajada
     - ADSR_S:nivel de mantenimiento 
-    - ADSR_R:tiempo de 
+    - ADSR_R:tiempo de Liberación
  
 * Un instrumento *percusivo*, como una guitarra o un piano, en el que el sonido tenga un ataque rápido, no haya
   mantenimiemto y el sonido se apague lentamente. El ejemplo que hemos usado ha sido [ADSR_A=0.05; ADSR_D=0.3; ADSR_S=0.01; ADSR_R=1; N=40] inspirado en otros ejemplos que pueden encontrarse en el documento adjunto en el README.md proporcionado por el profesor
