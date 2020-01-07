@@ -1,0 +1,8 @@
+[options]
+prefix = /Users/victorestrada/PAV
+libdir = lib
+buildtype = release
+backend = ninja
+
+[properties]
+

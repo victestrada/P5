@@ -27,32 +27,148 @@ visualizar el funcionamiento de la curva ADSR.
 
 * Un instrumento con una envolvente ADSR genérica, para el que se aprecie con claridad cada uno de sus parámetros:
   ataque (A), caída (D), mantenimiento (S) y liberación (R).
+  
+  Hemos usado un instrumento de la clase seno con unos valores iguales en todos los tiempos para obtener una curva más o meno intuitiva [ADSR_A=0.2; ADSR_D=0.2; ADSR_S=0.2; ADSR_R=0.2; N=40]: 
+  
+  <img src="img/instrument1.png" width="640" align="center">
+  
+  En la curva se representa: 
+    - ADSR_A:tiempo de ataque de 0 a 1.
+    - ADSR_D:tiempo de bajada
+    - ADSR_S:nivel de mantenimiento 
+    - ADSR_R:tiempo de 
+ 
 * Un instrumento *percusivo*, como una guitarra o un piano, en el que el sonido tenga un ataque rápido, no haya
-  mantenimiemto y el sonido se apague lentamente.
+  mantenimiemto y el sonido se apague lentamente. El ejemplo que hemos usado ha sido [ADSR_A=0.05; ADSR_D=0.3; ADSR_S=0.01; ADSR_R=1; N=40] inspirado en otros ejemplos que pueden encontrarse en el documento adjunto en el README.md proporcionado por el profesor
+  
   - Para un instrumento de este tipo, tenemos dos situaciones posibles:
     * El intérprete mantiene la nota *pulsada* hasta su completa extinción.
+    
+     <img src="img/instrument2.png" width="640" align="center">
+    
     * El intérprete da por finalizada la nota antes de su completa extinción, iniciándose una disminución rápida del
       sonido hasta su finalización.
-  - Debera representar en esta memoria **ambos** posibles finales de la nota.
+      
+      <img src="img/instrument3.png" width="640" align="center">
+      
+
 * Un instrumento *plano*, como los de cuerdas frotadas (violines y semejantes) o algunos de viento. En ellos, el
   ataque es relativamente rápido hasta alcanzar el nivel de mantenimiento (sin sobrecarga), y la liberación también
-  es bastante rápida.
+  es bastante rápida. Para representar un instrumento plano se han usado los valores [ADSR_A=0.2; ADSR_D=0; ADSR_S=1.2; ADSR_R=0.6; N=40;]
+  
+  <img src="img/instrument4.png" width="640" align="center">
 
-Para los cuatro casos, deberá incluir una gráfica en la que se visualice claramente la curva ADSR. Deberá añadir la
-información necesaria para su correcta interpretación, aunque esa información puede reducirse a colocar etiquetas y
-títulos adecuados en la propia gráfica (se valorará positivamente esta alternativa).
 
 ### Instrumentos Dumb y Seno.
 
 Implemente el instrumento `Seno` tomando como modelo el `InstrumentDumb`. La señal **deberá** formarse mediante
 búsqueda de los valores en una tabla.
 
-- Incluya, a continuación, el código del fichero `seno.cpp` con los métodos de la clase Seno.
+- A continuación se adjunta el código del fichero `seno.cpp` con ambos métodos command y synthesize.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~.sh
+#include <iostream>
+#include <math.h>
+#include "seno.h"
+#include "keyvalue.h"
+
+#include <stdlib.h>
+
+using namespace upc;
+using namespace std;
+
+InstrumentSIN::InstrumentSIN(const std::string &param) 
+  : adsr(SamplingRate, param) {
+  bActive = false;
+  x.resize(BSIZE);
+
+  /*
+    You can use the class keyvalue to parse "param" and configure your instrument.
+    Take a Look at keyvalue.h    
+  */
+  KeyValue kv(param);
+  int N;
+FILE * f = fopen("tblfile.log","a");
+  if (!kv.to_int("N",N))
+    N = 40; //default value
+
+  //Create a tbl with one period of a sinusoidal wave
+  tbl.resize(N);
+  float phase = 0, step = 2 * M_PI /(float) N;
+  index = 0;
+  for (int i=0; i < N ; ++i) {
+    tbl[i] = sin(phase);
+    phase += step;
+  }
+  fclose(f);
+}
+
+
+void InstrumentSIN::command(long cmd, long note, long vel) {
+
+f0 = 440*pow(2,(note - 69.)/12);
+
+  if (cmd == 9) {		//'Key' pressed: attack begins
+    bActive = true;
+    adsr.start();
+    index = 0;
+	a = 0;
+	inc = ((f0 / SamplingRate) * tbl.size());
+	A = vel / 127.;
+	a = 0;
+  }
+  else if (cmd == 8) {	//'Key' released: sustain ends, release begins
+    adsr.stop();
+  }
+  else if (cmd == 0) {	//Sound extinguished without waiting for release to end
+    adsr.end();
+  }
+}
+
+
+const vector<float> & InstrumentSIN::synthesize() {
+  if (not adsr.active()) {
+    x.assign(x.size(), 0);
+    bActive = false;
+    return x;
+  }
+  else if (not bActive)
+    return x;
+FILE * fp;
+fp = fopen("xvector.log","a");
+
+  for (unsigned int i=0; i<x.size(); ++i) {
+
+	a = a + inc;
+//Sin interpolación
+
+	x[i] = A * tbl[round(a)];
+
+//Con interpolación 
+//x[i] =tbl[floor(a)]+(a-floor(a))*(tbl[floor(a+1)]-tbl[floor(a)])/(floor(a+1)-floor(a));
+
+	 while(a >= tbl.size()) a = a - tbl.size();
+
+  }
+  adsr(x); //apply envelope to x and update internal status of ADSR
+fclose(fp);
+  return x;
+}
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 - Explique qué método se ha seguido para asignar un valor a la señal a partir de los contenidos en la tabla, e incluya
   una gráfica en la que se vean claramente (use pelotitas en lugar de líneas) los valores de la tabla y los de la
   señal generada.
-- Si ha implementado la síntesis por tabla almacenada en fichero externo, incluya a continuación el código del método
-  `command()`.
+  
+  Como bien se puede ver en el código y en el enunciado de la práctica asignamos a la frecuencia fundamental el siguiente valor : 
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~.sh
+  f0 = 440*pow(2,(note - 69.)/12);
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  
+ Por otro podemos recorrer a tabla que generamos a partir del seno de una fase determinada variando la velocidad.De esta forma se puede modificar la frecuencia del seno conseguir la fase que nos interese en función de f0.
+  
+  Al hacer un recorrido de la tabla obtenemos los siguientes valores: 
+  
+  <img src="img/figure1.png" width="640" align="center">
 
 ### Efectos sonoros.
 
@@ -60,9 +176,19 @@ búsqueda de los valores en una tabla.
   Deberá explicar detalladamente cómo se manifiestan los parámetros del efecto (frecuencia e índice de modulación) en
   la señal generada (se valorará que la explicación esté contenida en las propias gráficas, sin necesidad de
   *literatura*).
-- Si ha generado algún efecto por su cuenta, explique en qué consiste, cómo lo ha implementado y qué resultado ha
-  producido. Incluya, en el directorio `work/ejemplos`, los ficheros necesarios para apreciar el efecto, e indique,
-  a continuación, la orden necesaria para generar los ficheros de audio usando el programa `synth`.
+
+- Fragmento de Tremolo.wav
+
+  <img src="img/tremolo.png" width="640" align="center">
+
+- Fragmento de Vibrato.wav
+
+  <img src="img/vibrato.png" width="640" align="center">
+
+  En ambos casos el efecto acústico percibido para el oyente no entrenado es muy similar. Pero si miramos las formas de onda con el wavesurfer de dos ficheros generados con dichos efectos por separado ( tremolo.wav y vibrato.wav ) podemos ver las diferencias que hay entre ellos. 
+
+  El tremolo se caracteriza a nivel de onda por una variación significativa de la amplitud. Por otro lado el vibrato se caracteriza por una variación de la frecuencia.
+
 
 ### Síntesis FM.
 
@@ -90,6 +216,12 @@ Use el programa `synth` para generar canciones a partir de su partitura MIDI. Co
 - Coloque el resultado, junto con los ficheros necesarios para generarlo, en el directorio `work/music`.
 - Indique, a continuación, la orden necesaria para generar la señal (suponiendo que todos los archivos necesarios
   están en direcotorio indicado).
+
+  - En el directorio work se ejecuta la siguiente línea, generando el fichero ToyStory_A_Friend_in_me.wav
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~.sh
+  synth dumb.orc /Users/victorestrada/Desktop/PAV/P5/samples/ToyStory_A_Friend_in_me.sco ToyStory_A_Friend_in_me.wav
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 También puede orquestar otros temas más complejos, como la banda sonora de *Hawaii5-0* o el villacinco de John
 Lennon *Happy Xmas (War Is Over)* (fichero `The_Christmas_Song_Lennon.sco`), o cualquier otra canción de su agrado
